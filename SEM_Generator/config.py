@@ -42,8 +42,8 @@ MAX_DUPLICATE_ROWS = 0
 # TARGET LOADING FACTOR
 # (dipakai oleh indicator.py)
 # ==========================================================
-LOADING_MIN = 0.75
-LOADING_MAX = 0.85
+LOADING_MIN = 0.80
+LOADING_MAX = 0.90
 
 # ==========================================================
 # PROPORSI TARGET KATEGORI LIKERT
