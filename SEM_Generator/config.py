@@ -74,7 +74,21 @@ AVE_MIN = 0.50  # Average Variance Extracted
 # (dipakai oleh latent.py)
 # ==========================================================
 LATENT_CORR_MIN = 0.35
-LATENT_CORR_MAX = 0.70
+LATENT_CORR_MAX = 0.60
+# Diturunkan dari 0.70 -- korelasi rancangan yang mendekati 0.70 ditambah
+# noise sampling bisa membuat CFA sungguhan (AMOS) mengestimasi korelasi
+# ANTAR KONSTRUK di atas 0.70, cukup untuk membuat sepasang konstruk (mis.
+# EC-FC) gagal discriminant validity walau AVE/CR masing-masing sudah lolos.
+
+# ==========================================================
+# MARGIN AMAN DISCRIMINANT VALIDITY
+# (dipakai oleh quality_control.py, check_discriminant_validity)
+# ==========================================================
+# Koreksi disattenuation pada korelasi composite score masih sedikit
+# meremehkan korelasi CFA sungguhan (pada pengujian nyata, selisihnya
+# sampai ~0.04) -- margin ini menambah kehati-hatian supaya kasus yang
+# pas di garis batas tetap ketahuan di sini, bukan baru ketahuan di AMOS.
+DISCRIMINANT_SAFETY_MARGIN = 0.05
 
 # ==========================================================
 # PENGAMAN LOOP

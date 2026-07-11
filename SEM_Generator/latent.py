@@ -84,15 +84,35 @@ class LatentGenerator:
         tanpa pengecekan ulang. Function ini memperbaikinya secara
         otomatis sebelum dipakai.
 
+        CATATAN PENCEGAHAN:  # <-- BARU
+        Setelah eigenvalue negatif "dinaikkan" jadi sedikit positif,
+        hasilnya BELUM TENTU diagonalnya tetap tepat 1.0 -- padahal
+        syarat matriks KORELASI (bukan sekadar kovarians) adalah
+        diagonal harus selalu 1. Kalau tidak dijamin, korelasi antar
+        konstruk yang keluar bisa melenceng dari rentang
+        LATENT_CORR_MIN/MAX yang dirancang di config.py, tanpa
+        ketahuan. Di data Anda kemarin ini TIDAK terpicu (matriksnya
+        kebetulan sudah valid), tapi tetap dijaga untuk kasus lain.
+
         BAGAIMANA:
         Tidak perlu dihafal rumusnya -- cukup paham bahwa 3 baris di
         bawah "membongkar" matriks jadi komponen-komponennya, menaikkan
         bagian yang bernilai negatif (secara statistik mustahil) jadi
         sedikit positif, lalu menyusunnya kembali jadi matriks yang sah.
+        Baris tambahan di bawah (d = ..., matrix_fixed / ...) memaksa
+        diagonal kembali tepat 1.0 -- proses ini disebut mengubah
+        matriks KOVARIANS menjadi matriks KORELASI.
         """
         eigval, eigvec = eigh(matrix)
         eigval[eigval < 1e-8] = 1e-8
-        return eigvec @ np.diag(eigval) @ eigvec.T
+        matrix_fixed = eigvec @ np.diag(eigval) @ eigvec.T
+
+        # Renormalisasi -- jamin diagonal tepat 1.0 (matriks korelasi sah)  # <-- BARU
+        d = np.sqrt(np.diag(matrix_fixed))
+        matrix_fixed = matrix_fixed / np.outer(d, d)
+        np.fill_diagonal(matrix_fixed, 1.0)  # jaga-jaga sisa pembulatan floating point
+
+        return matrix_fixed
 
     def sample_latent(self):
         """

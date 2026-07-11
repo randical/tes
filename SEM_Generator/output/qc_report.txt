@@ -2,35 +2,35 @@
 Status keseluruhan: LOLOS
 
 Duplikat baris: 0 (syarat maks 0)
-Rata-rata: 3.989 (target (3.9, 4.1))
+Rata-rata: 3.985 (target (3.9, 4.1))
 SD       : 0.772 (target (0.65, 0.85))
 
 Cronbach's Alpha per konstruk:
-  PE: 0.855 -> OK
-  EE: 0.842 -> OK
-  SI: 0.876 -> OK
-  FC: 0.811 -> OK
-  HM: 0.862 -> OK
-  PV: 0.836 -> OK
-  EC: 0.843 -> OK
-  CL: 0.874 -> OK
+  PE: 0.885 -> OK
+  EE: 0.878 -> OK
+  SI: 0.902 -> OK
+  FC: 0.858 -> OK
+  HM: 0.890 -> OK
+  PV: 0.869 -> OK
+  EC: 0.902 -> OK
+  CL: 0.903 -> OK
 
 Composite Reliability & AVE per konstruk:
-  PE: CR=0.914, AVE=0.680 -> OK
-  EE: CR=0.895, AVE=0.631 -> OK
-  SI: CR=0.912, AVE=0.674 -> OK
-  FC: CR=0.888, AVE=0.614 -> OK
-  HM: CR=0.911, AVE=0.672 -> OK
-  PV: CR=0.893, AVE=0.626 -> OK
-  EC: CR=0.897, AVE=0.634 -> OK
-  CL: CR=0.900, AVE=0.644 -> OK
+  PE: CR=0.917, AVE=0.688 -> OK
+  EE: CR=0.912, AVE=0.674 -> OK
+  SI: CR=0.928, AVE=0.721 -> OK
+  FC: CR=0.898, AVE=0.639 -> OK
+  HM: CR=0.919, AVE=0.696 -> OK
+  PV: CR=0.907, AVE=0.661 -> OK
+  EC: CR=0.927, AVE=0.719 -> OK
+  CL: CR=0.928, AVE=0.722 -> OK
 
 Discriminant Validity (Fornell-Larcker):
-  PE: sqrt(AVE)=0.825 vs korelasi tertinggi=0.623 -> OK
-  EE: sqrt(AVE)=0.795 vs korelasi tertinggi=0.623 -> OK
-  SI: sqrt(AVE)=0.821 vs korelasi tertinggi=0.605 -> OK
-  FC: sqrt(AVE)=0.784 vs korelasi tertinggi=0.634 -> OK
-  HM: sqrt(AVE)=0.820 vs korelasi tertinggi=0.606 -> OK
-  PV: sqrt(AVE)=0.791 vs korelasi tertinggi=0.514 -> OK
-  EC: sqrt(AVE)=0.797 vs korelasi tertinggi=0.634 -> OK
-  CL: sqrt(AVE)=0.802 vs korelasi tertinggi=0.570 -> OK
+  PE: sqrt(AVE)=0.829 vs korelasi tertinggi=0.577 -> OK
+  EE: sqrt(AVE)=0.821 vs korelasi tertinggi=0.577 -> OK
+  SI: sqrt(AVE)=0.849 vs korelasi tertinggi=0.543 -> OK
+  FC: sqrt(AVE)=0.800 vs korelasi tertinggi=0.580 -> OK
+  HM: sqrt(AVE)=0.834 vs korelasi tertinggi=0.621 -> OK
+  PV: sqrt(AVE)=0.813 vs korelasi tertinggi=0.545 -> OK
+  EC: sqrt(AVE)=0.848 vs korelasi tertinggi=0.621 -> OK
+  CL: sqrt(AVE)=0.850 vs korelasi tertinggi=0.575 -> OK

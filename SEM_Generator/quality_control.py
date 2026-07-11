@@ -213,31 +213,65 @@ class QualityChecker:
         tumpang tindih -- item-itemnya sebenarnya mengukur hal yang
         sama.
 
+        KENAPA PAKAI KOREKSI DISATTENUATION:  # <-- BARU
+        Korelasi antar SKOR KOMPOSIT (rata-rata item mentah) SELALU
+        lebih lemah dibanding korelasi antar KONSTRUK LATEN sungguhan
+        -- composite score masih mengandung error pengukuran yang
+        "meredam" korelasinya, persis seperti loading yang melemah
+        kalau tidak dikoreksi (lihat _estimate_loadings_from_data).
+        Kalau dibiarkan tanpa koreksi, QC ini bisa bilang "LOLOS"
+        padahal CFA sungguhan (AMOS) bilang "GAGAL" -- ini PERSIS yang
+        terjadi pada pasangan EC-FC di data Anda (korelasi composite
+        0.671, tapi korelasi CFA sungguhan 0.774 -- cukup untuk
+        membuat keduanya gagal discriminant validity).
+        Rumus koreksinya (disattenuation / koreksi Spearman):
+            r_laten ~ r_composite / sqrt(CR_A x CR_B)
+        Tapi rumus ini masih sedikit meremehkan angka CFA sungguhan
+        (pada pengujian nyata, selisihnya sampai ~0.04) -- makanya
+        ditambah MARGIN AMAN (config.DISCRIMINANT_SAFETY_MARGIN)
+        supaya kasus yang pas di garis batas tetap tertangkap sebagai
+        "GAGAL" di sini, bukan baru ketahuan setelah buka AMOS.
+
         BAGAIMANA:
-        Untuk tiap konstruk, akar kuadrat AVE-nya (skor komposit
-        rata-rata item) HARUS lebih besar daripada korelasi tertinggi
-        konstruk itu dengan konstruk lain mana pun. Skor komposit
-        dipakai sebagai proksi skor konstruk laten.
-        (Catatan: check_validity() sekarang dipanggil SEKALI saja di
-        sini, ditampung ke variabel validity_report -- versi sebelumnya
-        memanggilnya ulang di dalam loop, jadi 8x lebih boros.)  # <-- DIUBAH
+        Untuk tiap konstruk, hitung korelasi composite score dengan
+        semua konstruk lain, koreksi tiap angkanya dengan rumus
+        disattenuation, ambil yang PALING TINGGI, lalu bandingkan
+        (sqrt(AVE) harus lebih besar dari korelasi terkoreksi + margin).
         """
         composite = pd.DataFrame({
             c: self.df[items].mean(axis=1) for c, items in config.CONSTRUCTS.items()
         })
         corr = composite.corr()
 
-        validity_report = self.check_validity()  # <-- DIUBAH: dihitung sekali saja
+        validity_report = self.check_validity()
 
         per_construct = {}
         for construct in config.CONSTRUCTS:
             ave = validity_report["per_construct"][construct]["ave"]
+            cr_self = validity_report["per_construct"][construct]["cr"]
             sqrt_ave = ave ** 0.5
-            other_corr = corr[construct].drop(construct).abs()
-            max_corr = other_corr.max()
-            passed = sqrt_ave > max_corr
+
+            max_disattenuated_corr = 0.0
+            max_partner = None
+            for other in config.CONSTRUCTS:
+                if other == construct:
+                    continue
+                observed_corr = corr.loc[construct, other]
+                cr_other = validity_report["per_construct"][other]["cr"]
+                # Koreksi disattenuation -- dibatasi maksimum 0.999 supaya
+                # tidak pernah "lewat" dari batas korelasi maksimum (1.0)
+                # akibat pembagian dengan angka CR yang kecil.
+                disattenuated = min(observed_corr / np.sqrt(cr_self * cr_other), 0.999)
+                if disattenuated > max_disattenuated_corr:
+                    max_disattenuated_corr = disattenuated
+                    max_partner = other
+
+            passed = sqrt_ave > (max_disattenuated_corr + config.DISCRIMINANT_SAFETY_MARGIN)
             per_construct[construct] = {
-                "sqrt_ave": sqrt_ave, "max_corr": max_corr, "passed": passed,
+                "sqrt_ave": sqrt_ave,
+                "max_corr": max_disattenuated_corr,
+                "max_corr_partner": max_partner,
+                "passed": passed,
             }
 
         overall_passed = all(res["passed"] for res in per_construct.values())
@@ -328,8 +362,8 @@ if __name__ == "__main__":
               f"(loading rancangan={res['design_loading_mean']:.3f}, "
               f"loading data={res['estimated_loading_mean']:.3f}, atenuasi={gap:.3f})")  # <-- BARU
 
-    print("\nDiscriminant Validity (Fornell-Larcker):")
+    print("\nDiscriminant Validity (Fornell-Larcker, sudah dikoreksi disattenuation):")
     for construct, res in report["discriminant"]["per_construct"].items():
         status_c = "OK" if res["passed"] else "MELESET"
         print(f"  {construct}: sqrt(AVE)={res['sqrt_ave']:.3f} vs korelasi tertinggi="
-              f"{res['max_corr']:.3f} -> {status_c}")
+              f"{res['max_corr']:.3f} (dgn {res['max_corr_partner']}) -> {status_c}")
