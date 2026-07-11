@@ -5,6 +5,15 @@ Petugas QA: memeriksa apakah dataset yang dihasilkan sudah
 memenuhi target di config.py (duplikasi, distribusi, reliabilitas,
 validitas). Modul ini TIDAK mengubah data, hanya melaporkan
 lolos/gagal -- keputusan untuk mengulang generate ada di optimizer.py.
+
+CATATAN PERBAIKAN:
+AVE dan CR sekarang dihitung dari LOADING YANG DIESTIMASI DARI DATA
+LIKERT sungguhan (lihat _estimate_loadings_from_data), bukan dari
+loading "rancangan" yang dipakai indicator.py untuk membuat data.
+Ini penting karena proses pembulatan ke skala Likert 1-5
+(ordinal_engine.py) dan error pengukuran SELALU melemahkan loading
+asli -- kalau QC hanya mengecek loading rancangan, dia bisa bilang
+"LOLOS" padahal analisis sungguhan di AMOS/SPSS nanti bilang "GAGAL".
 """
 
 import numpy as np
@@ -22,7 +31,9 @@ class QualityChecker:
 
     def __init__(self, df_likert, loadings):
         # df_likert: hasil akhir dari ordinal_engine.py (tabel Likert)
-        # loadings : dictionary loading dari indicator.py
+        # loadings : dictionary loading RANCANGAN dari indicator.py --
+        #            sekarang hanya dipakai sebagai pembanding di
+        #            laporan, bukan untuk menghitung AVE/CR lagi.
         self.df = df_likert
         self.loadings = loadings
 
@@ -107,6 +118,54 @@ class QualityChecker:
         ave = np.mean(loadings_arr ** 2)
         return cr, ave
 
+    def _estimate_loadings_from_data(self, items):
+        """
+        KENAPA:  # <-- BARU
+        Loading yang dipakai untuk MEMBUAT data (di indicator.py) itu
+        loading "rancangan" -- bukan loading yang akan ditemukan CFA
+        sungguhan (AMOS/SPSS) kalau data itu dianalisis. Antara
+        rancangan dan hasil analisis ada dua sumber pelemahan
+        (atenuasi):
+          1. Error pengukuran yang sengaja ditambahkan (supaya data
+             terasa manusiawi, bukan sempurna).
+          2. Pembulatan skor kontinu jadi kategori Likert 1-5
+             (ordinal_engine.py) -- proses ini SELALU melemahkan
+             korelasi asli, walau sedikit.
+        Kalau AVE/CR dihitung dari loading rancangan, hasilnya bisa
+        "LOLOS" padahal AMOS nanti bilang "GAGAL" (ini yang terjadi
+        pada konstruk FC kemarin). Supaya QC ini bisa dipercaya, dia
+        harus menghitung loading dari DATA yang benar-benar jadi --
+        sama seperti cara kerja AMOS.
+
+        BAGAIMANA:
+        Untuk 5 kolom satu konstruk, hitung matriks korelasi antar
+        item, lalu ambil komponen utama pertamanya (principal
+        component) lewat dekomposisi eigen. Loading tiap item
+        didekati dengan:
+            loading_item = eigenvector_item * akar(eigenvalue_terbesar)
+        Ini teknik factor analysis satu-faktor standar (principal
+        axis factoring) -- sangat dekat dengan hasil CFA untuk
+        konstruk unidimensional seperti punya kita.
+        """
+        item_corr = self.df[items].corr().values
+        eigenvalues, eigenvectors = np.linalg.eigh(item_corr)
+
+        # np.linalg.eigh mengurutkan dari KECIL ke BESAR -- ambil yang
+        # terakhir (terbesar), itu komponen utama pertama.
+        largest_idx = np.argmax(eigenvalues)
+        largest_eigenvalue = eigenvalues[largest_idx]
+        largest_eigenvector = eigenvectors[:, largest_idx]
+
+        estimated_loadings = largest_eigenvector * np.sqrt(largest_eigenvalue)
+
+        # Arah eigenvector itu ambigu (bisa "kebalik" semua tandanya) --
+        # loading yang benar harus positif, karena semua item dirancang
+        # searah dengan konstruknya.
+        if estimated_loadings.mean() < 0:
+            estimated_loadings = -estimated_loadings
+
+        return estimated_loadings
+
     def check_validity(self):
         """
         KENAPA:
@@ -115,20 +174,28 @@ class QualityChecker:
         banyak variansi item dibanding error-nya (syarat validitas
         konvergen standar dalam SEM).
 
-        BAGAIMANA:
-        Ambil daftar loading tiap konstruk dari self.loadings (hasil
-        indicator.py), hitung CR & AVE-nya, lalu cek terhadap syarat
-        minimum di config.py.
+        BAGAIMANA:  # <-- DIUBAH
+        Untuk tiap konstruk, loading dihitung LANGSUNG DARI DATA
+        Likert lewat _estimate_loadings_from_data() -- bukan dari
+        self.loadings rancangan lagi. Loading rancangan tetap
+        disimpan sebagai "design_loading_mean" di laporan, supaya
+        Anda bisa lihat sendiri seberapa jauh atenuasinya dibanding
+        "estimated_loading_mean" (hasil estimasi dari data).
         """
         per_construct = {}
         for construct, items in config.CONSTRUCTS.items():
-            item_loadings = [self.loadings[construct][item] for item in items]
-            cr, ave = self._calculate_cr_ave(item_loadings)
+            estimated_loadings = self._estimate_loadings_from_data(items)
+            cr, ave = self._calculate_cr_ave(estimated_loadings)
+
+            design_loadings = [self.loadings[construct][item] for item in items]
+
             cr_passed = cr >= config.CR_MIN
             ave_passed = ave >= config.AVE_MIN
             per_construct[construct] = {
                 "cr": cr, "ave": ave,
                 "cr_passed": cr_passed, "ave_passed": ave_passed,
+                "design_loading_mean": float(np.mean(design_loadings)),
+                "estimated_loading_mean": float(np.mean(estimated_loadings)),
             }
 
         overall_passed = all(
@@ -151,15 +218,20 @@ class QualityChecker:
         rata-rata item) HARUS lebih besar daripada korelasi tertinggi
         konstruk itu dengan konstruk lain mana pun. Skor komposit
         dipakai sebagai proksi skor konstruk laten.
+        (Catatan: check_validity() sekarang dipanggil SEKALI saja di
+        sini, ditampung ke variabel validity_report -- versi sebelumnya
+        memanggilnya ulang di dalam loop, jadi 8x lebih boros.)  # <-- DIUBAH
         """
         composite = pd.DataFrame({
             c: self.df[items].mean(axis=1) for c, items in config.CONSTRUCTS.items()
         })
         corr = composite.corr()
 
+        validity_report = self.check_validity()  # <-- DIUBAH: dihitung sekali saja
+
         per_construct = {}
         for construct in config.CONSTRUCTS:
-            ave = self.check_validity()["per_construct"][construct]["ave"]
+            ave = validity_report["per_construct"][construct]["ave"]
             sqrt_ave = ave ** 0.5
             other_corr = corr[construct].drop(construct).abs()
             max_corr = other_corr.max()
@@ -248,10 +320,13 @@ if __name__ == "__main__":
         status_c = "OK" if res["passed"] else "MELESET"
         print(f"  {construct}: {res['alpha']:.3f} -> {status_c}")
 
-    print("\nComposite Reliability & AVE per konstruk:")
+    print("\nComposite Reliability & AVE per konstruk (dari data, bukan rancangan):")  # <-- DIUBAH
     for construct, res in report["validity"]["per_construct"].items():
         status_c = "OK" if (res["cr_passed"] and res["ave_passed"]) else "MELESET"
-        print(f"  {construct}: CR={res['cr']:.3f}, AVE={res['ave']:.3f} -> {status_c}")
+        gap = res["design_loading_mean"] - res["estimated_loading_mean"]  # <-- BARU
+        print(f"  {construct}: CR={res['cr']:.3f}, AVE={res['ave']:.3f} -> {status_c}  "
+              f"(loading rancangan={res['design_loading_mean']:.3f}, "
+              f"loading data={res['estimated_loading_mean']:.3f}, atenuasi={gap:.3f})")  # <-- BARU
 
     print("\nDiscriminant Validity (Fornell-Larcker):")
     for construct, res in report["discriminant"]["per_construct"].items():
