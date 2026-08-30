@@ -75,7 +75,21 @@ class QualityChecker:
         sd = float(np.nanstd(nilai))
         lolos = (config.TARGET_MEAN[0] <= mean <= config.TARGET_MEAN[1]
                  and config.TARGET_STD[0] <= sd <= config.TARGET_STD[1])
-        return {"mean": round(mean, 3), "sd": round(sd, 3), "passed": lolos}
+
+        # TAMBAHAN PROYEK EV KALBAR. Rerata global saja tidak cukup, karena
+        # konstruk yang terlalu tinggi bisa saling menutupi konstruk yang
+        # terlalu rendah dan hasilnya tetap lolos.
+        per_konstruk, tol = {}, getattr(config, "CONSTRUCT_MEAN_TOLERANCE", 0.20)
+        for konstruk, (target_m, _) in getattr(
+                config, "CONSTRUCT_LIKERT_TARGET", {}).items():
+            m_k = float(self.df[config.CONSTRUCTS[konstruk]].to_numpy(dtype=float).mean())
+            ok_k = abs(m_k - target_m) <= tol
+            per_konstruk[konstruk] = {"mean": round(m_k, 3),
+                                      "target": target_m, "passed": ok_k}
+            lolos = lolos and ok_k
+
+        return {"mean": round(mean, 3), "sd": round(sd, 3),
+                "per_konstruk": per_konstruk, "passed": lolos}
 
     def check_reliability(self):
         hasil, lolos = {}, True

@@ -127,10 +127,36 @@ class OrdinalEngine:
         kategori = np.searchsorted(thresholds_item, scores) + 1
         return np.clip(kategori, 1, self.n_points)
 
+    def _thresholds_from(self, proportions):
+        cumulative = np.cumsum(proportions)
+        return norm.ppf(cumulative[:-1])
+
     def convert_dataframe(self, df_continuous):
+        """
+        TAMBAHAN PROYEK EV KALBAR.
+        Kalau config.CONSTRUCT_LIKERT_TARGET berisi target rerata per
+        konstruk, tiap konstruk memakai set ambangnya sendiri. Tanpa ini
+        seluruh konstruk terpaksa berbagi satu rerata global, sehingga
+        Government Promotion tidak bisa dibuat lebih rendah daripada
+        Perceived Usefulness. Padahal justru selisih itulah yang membuat
+        datanya masuk akal untuk konteks Kalimantan Barat.
+        """
+        target = getattr(config, "CONSTRUCT_LIKERT_TARGET", None)
+        peta = {}
+        if target:
+            for konstruk, (m, s) in target.items():
+                props, _, _ = find_proportions(self.n_points, m, s)
+                thr = self._thresholds_from(props)
+                for item in config.CONSTRUCTS[konstruk]:
+                    peta[item] = thr
+
         hasil = df_continuous.copy()
         for kolom in df_continuous.columns:
+            simpan = self.base_thresholds
+            if kolom in peta:
+                self.base_thresholds = peta[kolom]
             hasil[kolom] = self.convert_one_column(df_continuous[kolom].values)
+            self.base_thresholds = simpan
         return hasil
 
 

@@ -88,12 +88,14 @@ class IndicatorGenerator:
         Kalau data buatan tidak punyanya, latihan membaca Modification
         Indices jadi tidak ada gunanya.
         """
-        pasangan = []
+        pasangan = list(getattr(config, "FORCED_ERROR_PAIRS", []))
         if getattr(config, "CORRELATED_ERROR_RATE", 0) <= 0:
             return pasangan
         for items in config.CONSTRUCTS.values():
             for i in range(len(items)):
                 for j in range(i + 1, len(items)):
+                    if (items[i], items[j]) in pasangan:
+                        continue
                     if self.rng.random() < config.CORRELATED_ERROR_RATE:
                         pasangan.append((items[i], items[j]))
         return pasangan

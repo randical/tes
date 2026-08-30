@@ -38,10 +38,15 @@ class LatentGenerator:
         LATENT_CORR_MIN sampai LATENT_CORR_MAX, lalu cerminkan ke sisi
         bawah matriks. Diagonal selalu 1.0.
         """
+        override = getattr(config, "LATENT_CORR_OVERRIDE", None)
         m = np.eye(self.n)
         for i in range(self.n):
             for j in range(i + 1, self.n):
-                r = self.rng.uniform(config.LATENT_CORR_MIN, config.LATENT_CORR_MAX)
+                a, b = self.constructs[i], self.constructs[j]
+                if override is not None and ((a, b) in override or (b, a) in override):
+                    r = float(override.get((a, b), override.get((b, a))))
+                else:
+                    r = self.rng.uniform(config.LATENT_CORR_MIN, config.LATENT_CORR_MAX)
                 m[i, j] = m[j, i] = r
         return m
 
